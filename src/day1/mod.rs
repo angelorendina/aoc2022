@@ -30,7 +30,6 @@ impl<const N: usize> ChunkiestElves<N> {
         }
 
         // remember to store the last elf!
-        // empty lines at the end of the file are ignored when iterating with `.lines()`
         this.push(elf);
 
         this
@@ -42,10 +41,9 @@ impl<const N: usize> ChunkiestElves<N> {
         // this lower value is the new target, and we keep iterating down the ordered list
         // repeating the process as needed.
         // Essentially, this is inserting the value at the right place and shifting lower values further
-        for i in 0..N {
-            if self.elves[i] < elf {
-                // SAFETY: elves has exactly N elements
-                std::mem::swap(unsafe { self.elves.get_unchecked_mut(i) }, &mut elf);
+        for candidate in self.elves.iter_mut() {
+            if candidate < &mut elf {
+                std::mem::swap(candidate, &mut elf);
             }
         }
     }
