@@ -1,39 +1,40 @@
 use std::collections::BTreeMap;
 use std::collections::VecDeque;
-use std::ptr::NonNull;
 
-enum Entity {
-    File { size: u64 },
-    Folder { content: BTreeMap<String, Entity> },
+struct Folder {
+    files: BTreeMap<String, u64>,
+    folders: BTreeMap<String, Self>,
 }
 
-impl Entity {
-    fn touch(size: u64) -> Self {
-        Entity::File { size }
+impl Folder {
+    fn new() -> Self {
+        Self {
+            files: BTreeMap::new(),
+            folders: BTreeMap::new(),
+        }
     }
 
-    fn mkdir() -> Self {
-        Entity::Folder {
-            content: BTreeMap::new(),
-        }
+    fn touch(&mut self, name: String, size: u64) {
+        self.files.insert(name, size);
+    }
+
+    fn mkdir(&mut self, name: String) {
+        self.folders.insert(name, Self::new());
     }
 
     fn size(&self) -> u64 {
-        match self {
-            Entity::File { size } => *size,
-            Entity::Folder { content } => content.values().map(Self::size).sum::<u64>(),
-        }
+        self.folders.values().map(Self::size).sum::<u64>() + self.files.values().sum::<u64>()
     }
 }
 
 struct Filesystem {
-    root: Entity,
+    root: Folder,
 }
 
 impl Filesystem {
     fn new() -> Self {
         Self {
-            root: Entity::mkdir(),
+            root: Folder::new(),
         }
     }
 
@@ -43,12 +44,12 @@ impl Filesystem {
         // reference to the current working directory: used to read/write data
         let mut cwd = &mut filesystem.root;
         // stack of references to the parents of `cwd`: used to navigate up;
-        // uses NonNull pointers as borrowing rules make it impossible to have
+        // uses pointers, as borrowing rules make it impossible to have
         // separate &mut references to something AND its content
         // (since they'd be pointing to overlapping memory);
         // we tackle this by threading read/write access through
         // the only "active" &mut reference `cwd`
-        let mut stack = Vec::<NonNull<Entity>>::new();
+        let mut stack = Vec::<*mut Folder>::new();
 
         for line in values.lines() {
             let mut tokens = line.split_whitespace();
@@ -61,7 +62,7 @@ impl Filesystem {
                         }
                         Some("..") => {
                             cwd = match stack.pop() {
-                                Some(mut parent) => unsafe {
+                                Some(parent) => unsafe {
                                     // SAFETY:
                                     // - the pointer is
                                     //      + properly aligned
@@ -70,15 +71,14 @@ impl Filesystem {
                                     //      since it was obtained directly from a &mut
                                     // - aliasing rules are respected
                                     //      since we are only reading and writing through `cwd`
-                                    parent.as_mut()
+                                    parent.as_mut().unwrap()
                                 },
                                 None => &mut filesystem.root,
                             }
                         }
                         Some(name) => {
-                            stack.push(NonNull::new(cwd).expect("cwd must be non-null"));
-                            let Entity::Folder { content } = cwd else { panic!("cwd must be a folder") };
-                            cwd = content.get_mut(name).expect("cd target must exist")
+                            stack.push(cwd);
+                            cwd = cwd.folders.get_mut(name).expect("folder must exist");
                         }
                         _ => unreachable!("unrecognised cd operand"),
                     },
@@ -86,19 +86,13 @@ impl Filesystem {
                     _ => unreachable!("unrecognised command"),
                 },
                 Some("dir") => {
-                    let name = tokens.next().expect("dir must have a name");
-                    let Entity::Folder { content } = cwd else { panic!("cwd must be a folder") };
-                    content
-                        .entry(name.to_string())
-                        .or_insert_with(Entity::mkdir);
+                    let name = tokens.next().expect("file must have a name");
+                    cwd.mkdir(name.to_string());
                 }
                 Some(size) => {
                     let name = tokens.next().expect("file must have a name");
                     let size = size.parse::<u64>().expect("size must be a u64");
-                    let Entity::Folder { content } = cwd else { panic!("cwd must be a folder") };
-                    content
-                        .entry(name.to_string())
-                        .or_insert_with(|| Entity::touch(size));
+                    cwd.touch(name.to_string(), size);
                 }
                 _ => unreachable!("unrecognised"),
             }
@@ -118,13 +112,12 @@ pub fn star_one() -> u64 {
 
     let mut s = 0;
     let mut queue = VecDeque::from([&filesystem.root]);
-    while let Some(entity) = queue.pop_front() {
-        let Entity::Folder { content } = entity else { continue };
-        let size = entity.size();
+    while let Some(folder) = queue.pop_front() {
+        let size = folder.size();
         if size <= 100_000 {
             s += size;
         }
-        for child in content.values() {
+        for child in folder.folders.values() {
             queue.push_back(child);
         }
     }
@@ -146,11 +139,10 @@ pub fn star_two() -> u64 {
     let mut folder_by_size = BTreeMap::new();
 
     let mut queue = VecDeque::from([&filesystem.root]);
-    while let Some(entity) = queue.pop_front() {
-        let Entity::Folder { content } = entity else { continue };
-        let size = entity.size();
-        folder_by_size.insert(size, entity);
-        for child in content.values() {
+    while let Some(folder) = queue.pop_front() {
+        let size = folder.size();
+        folder_by_size.insert(size, folder);
+        for child in folder.folders.values() {
             queue.push_back(child);
         }
     }
