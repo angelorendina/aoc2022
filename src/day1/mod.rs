@@ -78,39 +78,4 @@ mod tests {
     fn test_star_two() {
         assert_eq!(star_two(), 45000);
     }
-
-    #[test]
-    fn fuzzy_push_chunkiest_elves() {
-        // do 1000 fuzzy tests
-        for _ in 0..1000 {
-            let mut chonks = ChunkiestElves { elves: [0; 3] };
-
-            // generate a sample of variable length (0 to 255)
-            let sample_size: u8 = rand::random();
-            let sample_size = sample_size as usize;
-            // sample is made of uniformly distributed u64 values
-            let mut sample = Vec::<u64>::with_capacity(sample_size);
-            for _ in 0..sample_size {
-                let value: u64 = rand::random();
-                sample.push(value);
-                // push the value to chonks!
-                // this should keep the highest three, descendingly ordered
-                chonks.push(value);
-            }
-
-            // now sort the whole sample descendingly
-            sample.sort();
-            sample.reverse();
-
-            // consider the highest three values from the sample, and compare with the elves in chonks
-            // since the samples could be fewer than 3, we take what's there and default to 0 if not enough
-            let expected = (0..3).map(|i| sample.get(i).unwrap_or(&0));
-            let actual = chonks.elves.iter();
-
-            // they should match!
-            for (expected, actual) in expected.zip(actual) {
-                assert_eq!(expected, actual);
-            }
-        }
-    }
 }

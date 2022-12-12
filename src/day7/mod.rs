@@ -41,15 +41,43 @@ impl Filesystem {
     fn parse(values: &str) -> Self {
         let mut filesystem = Filesystem::new();
 
-        // reference to the current working directory: used to read/write data
-        let mut cwd = &mut filesystem.root;
         // stack of references to the parents of `cwd`: used to navigate up;
         // uses pointers, as borrowing rules make it impossible to have
         // separate &mut references to something AND its content
         // (since they'd be pointing to overlapping memory);
         // we tackle this by threading read/write access through
-        // the only "active" &mut reference `cwd`
-        let mut stack = Vec::<*mut Folder>::new();
+        // only one pointer at the time (the last of the list)
+        struct Path(Vec<*mut Folder>);
+
+        impl Path {
+            fn go_up(&mut self) {
+                if self.0.len() > 1 {
+                    self.0.pop();
+                }
+            }
+
+            fn go_root(&mut self) {
+                self.0.truncate(1);
+            }
+
+            fn cwd(&mut self) -> &mut Folder {
+                unsafe {
+                    self.0
+                        .last_mut()
+                        .expect("path should not be empty")
+                        .as_mut()
+                        .expect("pointer should be dereferenceable")
+                }
+            }
+
+            fn enter(&mut self, name: &str) {
+                let cwd = self.cwd();
+                let dir = cwd.folders.get_mut(name).expect("folder must exist") as *mut Folder;
+                self.0.push(dir);
+            }
+        }
+
+        let mut path = Path(vec![&mut filesystem.root as *mut Folder]);
 
         for line in values.lines() {
             let mut tokens = line.split_whitespace();
@@ -57,28 +85,13 @@ impl Filesystem {
                 Some("$") => match tokens.next() {
                     Some("cd") => match tokens.next() {
                         Some("/") => {
-                            stack.clear();
-                            cwd = &mut filesystem.root;
+                            path.go_root();
                         }
                         Some("..") => {
-                            cwd = match stack.pop() {
-                                Some(parent) => unsafe {
-                                    // SAFETY:
-                                    // - the pointer is
-                                    //      + properly aligned
-                                    //      + dereferenceable
-                                    //      + pointing to initialised memory
-                                    //      since it was obtained directly from a &mut
-                                    // - aliasing rules are respected
-                                    //      since we are only reading and writing through `cwd`
-                                    parent.as_mut().unwrap()
-                                },
-                                None => &mut filesystem.root,
-                            }
+                            path.go_up();
                         }
                         Some(name) => {
-                            stack.push(cwd);
-                            cwd = cwd.folders.get_mut(name).expect("folder must exist");
+                            path.enter(name);
                         }
                         _ => unreachable!("unrecognised cd operand"),
                     },
@@ -87,12 +100,12 @@ impl Filesystem {
                 },
                 Some("dir") => {
                     let name = tokens.next().expect("file must have a name");
-                    cwd.mkdir(name.to_string());
+                    path.cwd().mkdir(name.to_string());
                 }
                 Some(size) => {
                     let name = tokens.next().expect("file must have a name");
                     let size = size.parse::<u64>().expect("size must be a u64");
-                    cwd.touch(name.to_string(), size);
+                    path.cwd().touch(name.to_string(), size);
                 }
                 _ => unreachable!("unrecognised"),
             }
