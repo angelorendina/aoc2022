@@ -2,6 +2,7 @@ mod day1;
 mod day10;
 mod day11;
 mod day12;
+mod day13;
 mod day2;
 mod day3;
 mod day4;
@@ -47,4 +48,7 @@ fn main() {
 
     println!("12.1: {}", day12::star_one());
     println!("12.2: {}", day12::star_two());
+
+    println!("13.1: {}", day13::star_one());
+    println!("13.2: {}", day13::star_two());
 }
