@@ -1,9 +1,12 @@
+#![feature(drain_filter)]
+
 mod day1;
 mod day10;
 mod day11;
 mod day12;
 mod day13;
 mod day14;
+mod day15;
 mod day2;
 mod day3;
 mod day4;
@@ -55,4 +58,7 @@ fn main() {
 
     println!("14.1: {}", day14::star_one());
     println!("14.2: {}", day14::star_two());
+
+    println!("15.1: {}", day15::star_one());
+    println!("15.2: {}", day15::star_two());
 }
