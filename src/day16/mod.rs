@@ -308,7 +308,7 @@ pub fn star_two() -> usize {
             continue;
         }
 
-        if my_pathing.len() < 25 {
+        if my_pathing.len() < 25 || his_pathing.len() < 25 {
             if my_pathing.len() <= his_pathing.len() {
                 let my_id_at = match my_pathing.last() {
                     Some(Action::Open(id_at)) => *id_at,
@@ -326,7 +326,7 @@ pub fn star_two() -> usize {
                         let mut my_pathing = my_pathing.clone();
                         my_pathing.extend(path_extension);
                         my_pathing.push(Action::Open(good_id_to));
-                        exploration.push_back((my_pathing, his_pathing.clone()));
+                        exploration.push_front((my_pathing, his_pathing.clone()));
                     }
                 }
             } else {
@@ -346,29 +346,7 @@ pub fn star_two() -> usize {
                         let mut his_pathing = his_pathing.clone();
                         his_pathing.extend(path_extension);
                         his_pathing.push(Action::Open(good_id_to));
-                        exploration.push_back((my_pathing.clone(), his_pathing));
-                    }
-                }
-            }
-        } else {
-            if his_pathing.len() < 25 {
-                let his_id_at = match his_pathing.last() {
-                    Some(Action::Open(id_at)) => *id_at,
-                    None => "AA",
-                    _ => unreachable!(),
-                };
-                for &good_id_to in good_valves.keys() {
-                    if !good_ids_visited.contains(good_id_to) {
-                        let path_extension = map
-                            .get(&(his_id_at, good_id_to))
-                            .unwrap()
-                            .into_iter()
-                            .skip(1)
-                            .map(|id| Action::Walk(*id));
-                        let mut his_pathing = his_pathing.clone();
-                        his_pathing.extend(path_extension);
-                        his_pathing.push(Action::Open(good_id_to));
-                        exploration.push_back((my_pathing.clone(), his_pathing));
+                        exploration.push_front((my_pathing.clone(), his_pathing));
                     }
                 }
             }
