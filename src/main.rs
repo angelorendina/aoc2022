@@ -1,5 +1,3 @@
-#![feature(drain_filter)]
-
 mod day1;
 mod day10;
 mod day11;
@@ -13,6 +11,7 @@ mod day18;
 // mod day19;
 mod day2;
 mod day20;
+mod day21;
 mod day3;
 mod day4;
 mod day5;
@@ -81,4 +80,7 @@ fn main() {
 
     println!("20.1: {}", day20::star_one());
     println!("20.2: {}", day20::star_two());
+
+    println!("21.1: {}", day21::star_one());
+    println!("21.2: {}", day21::star_two());
 }
