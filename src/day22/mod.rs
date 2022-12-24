@@ -2,153 +2,140 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
-struct V {
-    x: isize,
-    y: isize,
-    z: isize,
+struct V3([isize; 3]);
+
+impl std::ops::Deref for V3 {
+    type Target = [isize; 3];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
-impl std::ops::Mul<V> for V {
+impl std::ops::Mul<V3> for V3 {
     type Output = isize;
 
-    fn mul(self, rhs: V) -> Self::Output {
-        self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
-    }
-}
-
-impl V {
-    const fn x() -> Self {
-        V {
-            x: 1,
-            ..Default::default()
-        }
-    }
-
-    const fn y() -> Self {
-        V {
-            y: 1,
-            ..Default::default()
-        }
-    }
-
-    const fn z() -> Self {
-        V {
-            z: 1,
-            ..Default::default()
-        }
-    }
-
-    const fn xneg() -> Self {
-        V {
-            x: -1,
-            ..Default::default()
-        }
-    }
-
-    const fn yneg() -> Self {
-        V {
-            y: -1,
-            ..Default::default()
-        }
-    }
-
-    const fn zneg() -> Self {
-        V {
-            z: -1,
-            ..Default::default()
-        }
+    fn mul(self, rhs: V3) -> Self::Output {
+        (0..3).map(|i| self[i] * rhs[i]).sum()
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
-struct M(V, V, V);
+struct M3([V3; 3]);
 
-impl std::ops::Mul<V> for M {
-    type Output = V;
+impl std::ops::Deref for M3 {
+    type Target = [V3; 3];
 
-    fn mul(self, rhs: V) -> Self::Output {
-        let M(r1, r2, r3) = self.transpose();
-        V {
-            x: r1 * rhs,
-            y: r2 * rhs,
-            z: r3 * rhs,
-        }
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
-impl std::ops::Mul<M> for M {
-    type Output = M;
+impl M3 {
+    fn transposed(self) -> Self {
+        M3([
+            V3([self[0][0], self[0][1], self[0][2]]),
+            V3([self[1][0], self[1][1], self[1][2]]),
+            V3([self[2][0], self[2][1], self[2][2]]),
+        ])
+    }
 
-    fn mul(self, rhs: M) -> Self::Output {
-        let M(r1, r2, r3) = self.transpose();
-        let M(c1, c2, c3) = rhs;
-        M(
-            V {
-                x: r1 * c1,
-                y: r1 * c2,
-                z: r1 * c3,
-            },
-            V {
-                x: r2 * c1,
-                y: r2 * c2,
-                z: r2 * c3,
-            },
-            V {
-                x: r3 * c1,
-                y: r3 * c2,
-                z: r3 * c3,
-            },
-        )
+    fn complement(self, row: usize, column: usize) -> M2 {
+        let M3(columns) = self;
+        let mut new_columns = columns
+            .into_iter()
+            .enumerate()
+            .filter(|(c, _)| *c != column)
+            .map(|(_, c)| {
+                let V3(rows) = c;
+                let mut new_rows = rows
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(r, _)| *r != row)
+                    .map(|(_, x)| x);
+                V2([new_rows.next().unwrap(), new_rows.next().unwrap()])
+            });
+        M2([new_columns.next().unwrap(), new_columns.next().unwrap()])
     }
 }
 
-impl M {
-    const fn identity() -> Self {
-        M(V::x(), V::y(), V::z())
+impl std::ops::Mul<V3> for M3 {
+    type Output = V3;
+
+    fn mul(self, rhs: V3) -> Self::Output {
+        let M3([r1, r2, r3]) = self.transposed();
+        V3([r1 * rhs, r2 * rhs, r3 * rhs])
+    }
+}
+
+impl std::ops::Mul<M3> for M3 {
+    type Output = M3;
+
+    fn mul(self, rhs: M3) -> Self::Output {
+        let M3([c1, c2, c3]) = rhs;
+        M3([self * c1, self * c2, self * c3])
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
+struct V2([isize; 2]);
+
+impl std::ops::Deref for V2 {
+    type Target = [isize; 2];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::Mul<V2> for V2 {
+    type Output = isize;
+
+    fn mul(self, rhs: V2) -> Self::Output {
+        (0..2).map(|i| self[i] * rhs[i]).sum()
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
+struct M2([V2; 2]);
+
+impl std::ops::Deref for M2 {
+    type Target = [V2; 2];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl M2 {
+    fn transposed(self) -> Self {
+        M2([V2([self[0][0], self[0][1]]), V2([self[1][0], self[1][1]])])
     }
 
-    const fn x() -> Self {
-        M(V::x(), V::z(), V::yneg())
+    fn inverted(self) -> Self {
+        let det = self[0][0] * self[1][1] - self[0][1] * self[1][0];
+        M2([
+            V2([self[1][1] / det, -self[0][1] / det]),
+            V2([-self[1][0] / det, self[0][0] / det]),
+        ])
     }
+}
 
-    const fn y() -> Self {
-        M(V::zneg(), V::y(), V::x())
+impl std::ops::Mul<V2> for M2 {
+    type Output = V2;
+
+    fn mul(self, rhs: V2) -> Self::Output {
+        let M2([r1, r2]) = self.transposed();
+        V2([r1 * rhs, r2 * rhs])
     }
+}
 
-    const fn z() -> Self {
-        M(V::y(), V::xneg(), V::z())
-    }
+impl std::ops::Mul<M2> for M2 {
+    type Output = M2;
 
-    const fn xneg() -> Self {
-        M(V::x(), V::zneg(), V::y())
-    }
-
-    const fn yneg() -> Self {
-        M(V::z(), V::y(), V::xneg())
-    }
-
-    const fn zneg() -> Self {
-        M(V::yneg(), V::x(), V::z())
-    }
-
-    const fn transpose(self) -> Self {
-        M(
-            V {
-                x: self.0.x,
-                y: self.1.x,
-                z: self.2.x,
-            },
-            V {
-                x: self.0.y,
-                y: self.1.y,
-                z: self.2.y,
-            },
-            V {
-                x: self.0.z,
-                y: self.1.z,
-                z: self.2.z,
-            },
-        )
+    fn mul(self, rhs: M2) -> Self::Output {
+        let M2([c1, c2]) = rhs;
+        M2([self * c1, self * c2])
     }
 }
 
@@ -163,16 +150,6 @@ enum Direction {
     Right,
     Up,
     Down,
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
-enum Face {
-    Top,
-    Bottom,
-    Far,
-    Near,
-    Right,
-    Left,
 }
 
 pub fn star_one() -> isize {
@@ -224,7 +201,7 @@ pub fn star_one() -> isize {
     let mut code_index = 0;
     loop {
         let mut rotation = None;
-        let mut steps = 0;
+        let steps;
 
         let mut token_end = code_index + 1;
         while token_end < code.len() {
@@ -420,62 +397,49 @@ pub fn star_two() -> isize {
             }
         }
     }
-    let mut cube = BTreeMap::<(isize, isize), (V, M)>::new();
+    let mut cube = BTreeMap::<(isize, isize), M3>::new();
     let first_face = corners.iter().next().unwrap().clone();
-    cube.insert(first_face, (V::zneg(), M::identity()));
+    cube.insert(
+        first_face,
+        M3([V3([0, -1, 0]), V3([1, 0, 0]), V3([0, 0, 1])]),
+    );
+
+    let rot_south = M3([V3([0, 0, -1]), V3([0, 1, 0]), V3([1, 0, 0])]);
+    let rot_north = M3([V3([0, 0, 1]), V3([0, 1, 0]), V3([-1, 0, 0])]);
+    let rot_east = M3([V3([1, 0, 0]), V3([0, 0, -1]), V3([0, 1, 0])]);
+    let rot_west = M3([V3([1, 0, 0]), V3([0, 0, 1]), V3([0, -1, 0])]);
+
     while cube.len() < 6 {
         let mut x = None;
-        for (&coords, &(side, m)) in &cube {
+        for (&coords, &m) in &cube {
             let neighbour = (coords.0, coords.1 + face_size);
             if corners.contains(&neighbour) && !cube.contains_key(&neighbour) {
-                // TODO!
-                x = Some((neighbour, nei));
+                let mm = m * rot_east;
+                x = Some((neighbour, mm));
                 break;
             }
             let neighbour = (coords.0, coords.1 - face_size);
             if corners.contains(&neighbour) && !cube.contains_key(&neighbour) {
-                let nei = match side {
-                    Face::Top => todo!(),
-                    Face::Bottom => todo!(),
-                    Face::Far => todo!(),
-                    Face::Near => (Face::Left, GM::from_rotation_z(TAU)),
-                    Face::Right => (Face::Near, GM::from_rotation_z(TAU)),
-                    Face::Left => (Face::Far, GM::from_rotation_z(TAU)),
-                };
-                x = Some((neighbour, nei));
+                let mm = m * rot_west;
+                x = Some((neighbour, mm));
                 break;
             }
             let neighbour = (coords.0 + face_size, coords.1);
             if corners.contains(&neighbour) && !cube.contains_key(&neighbour) {
-                let nei = match side {
-                    Face::Top => (Face::Near, GM::from_rotation_z(TAU)),
-                    Face::Bottom => todo!(),
-                    Face::Far => todo!(),
-                    Face::Near => (Face::Right, GM::from_rotation_z(TAU)),
-                    Face::Right => todo!(),
-                    Face::Left => todo!(),
-                };
-                x = Some((neighbour, nei));
+                let mm = m * rot_south;
+                x = Some((neighbour, mm));
                 break;
             }
             let neighbour = (coords.0 - face_size, coords.1);
             if corners.contains(&neighbour) && !cube.contains_key(&neighbour) {
-                let nei = match side {
-                    Face::Top => todo!(),
-                    Face::Bottom => todo!(),
-                    Face::Far => todo!(),
-                    Face::Near => todo!(),
-                    Face::Right => todo!(),
-                    Face::Left => todo!(),
-                };
-                x = Some((neighbour, nei));
+                let mm = m * rot_north;
+                x = Some((neighbour, mm));
                 break;
             }
         }
         let x = x.unwrap();
         cube.insert(x.0, x.1);
     }
-    println!("{:#?}", cube);
 
     let mut position = (start.1, start.2);
     let mut direction = Direction::Right;
@@ -483,7 +447,7 @@ pub fn star_two() -> isize {
     let mut code_index = 0;
     loop {
         let mut rotation = None;
-        let mut steps = 0;
+        let steps;
 
         let mut token_end = code_index + 1;
         while token_end < code.len() {
@@ -502,6 +466,26 @@ pub fn star_two() -> isize {
         code_index = token_end + 1;
 
         'walk: for _ in 0..steps {
+            println!("{steps} {rotation:?}");
+            for r in -10..10 {
+                let r = position.0 + r;
+                for c in -10..10 {
+                    let c = position.1 + c;
+                    print!("{}", match map.get(&(r,c)) {
+                        _ if (r == position.0 && c == position.1) => match direction {
+                            Direction::Down => "v",
+                            Direction::Up => "^",
+                            Direction::Left => "<",
+                            Direction::Right => ">",
+                        }
+                        Some(Cell::Floor) => ".",
+                        Some(Cell::Wall) => "#",
+                        None => " ",
+                    });
+                }
+                println!()
+            }
+            println!();
             match direction {
                 Direction::Left => match map.get(&(position.0, position.1 - 1)) {
                     Some(Cell::Floor) => {
@@ -515,26 +499,43 @@ pub fn star_two() -> isize {
                             position.0 / face_size * face_size,
                             position.1 / face_size * face_size,
                         );
-                        let face_at = cube[&corner_at];
-                        // let face_to = match face_at {
-                        //     Face::Top => Face::Left;
-                        //     Face::Bottom => todo!(),
-                        //     Face::Far => todo!(),
-                        //     Face::Near => todo!(),
-                        //     Face::Right => todo!(),
-                        //     Face::Left => todo!(),
-                        // };
-                        'wrap: for c in (isize::MIN..=max_column).rev() {
-                            match map.get(&(position.0, c)) {
-                                Some(Cell::Floor) => {
-                                    position = (position.0, c);
-                                    break 'wrap;
-                                }
-                                Some(Cell::Wall) => {
-                                    break 'walk;
-                                }
-                                None => {}
+                        let spatial_rotation_at = cube[&corner_at];
+                        let spatial_turn = spatial_rotation_at * rot_west;
+                        let (&corner_there, &matching_spatial) = cube
+                            .iter()
+                            .find(|(_, m)| m[2] == spatial_turn[2])
+                            .unwrap();
+                        let (complement_row, _) = spatial_turn[2]
+                            .iter()
+                            .enumerate()
+                            .find(|(_, x)| **x != 0)
+                            .unwrap();
+                        let local_turn = spatial_turn.complement(complement_row, 2);
+                        let local_there = matching_spatial.complement(complement_row, 2);
+                        let transition = local_there * local_turn.inverted();
+                        let position_and_direction =
+                            M2([V2([position.0 - corner_at.0, 0]), V2([0, -1])]);
+                        let M2([local_position_there, new_direction]) =
+                            transition * position_and_direction;
+                        let position_there = (
+                            local_position_there[0] + corner_there.0,
+                            local_position_there[1] + corner_there.1,
+                        );
+                        match map.get(&position_there) {
+                            Some(Cell::Floor) => {
+                                position = position_there;
+                                direction = match new_direction.0 {
+                                    [0, 1] => Direction::Right,
+                                    [0, -1] => Direction::Left,
+                                    [1, 0] => Direction::Down,
+                                    [-1, 0] => Direction::Up,
+                                    _ => unreachable!(),
+                                };
                             }
+                            Some(Cell::Wall) => {
+                                break 'walk;
+                            }
+                            None => unreachable!(),
                         }
                     }
                 },
@@ -546,17 +547,47 @@ pub fn star_two() -> isize {
                         break 'walk;
                     }
                     None => {
-                        'wrap: for c in 0.. {
-                            match map.get(&(position.0, c)) {
-                                Some(Cell::Floor) => {
-                                    position = (position.0, c);
-                                    break 'wrap;
-                                }
-                                Some(Cell::Wall) => {
-                                    break 'walk;
-                                }
-                                None => {}
+                        let corner_at = (
+                            position.0 / face_size * face_size,
+                            position.1 / face_size * face_size,
+                        );
+                        let spatial_rotation_at = cube[&corner_at];
+                        let spatial_turn = spatial_rotation_at * rot_east;
+                        let (&corner_there, &matching_spatial) = cube
+                            .iter()
+                            .find(|(_, m)| m[2] == spatial_turn[2])
+                            .unwrap();
+                        let (complement_row, _) = spatial_turn[2]
+                            .iter()
+                            .enumerate()
+                            .find(|(_, x)| **x != 0)
+                            .unwrap();
+                        let local_turn = spatial_turn.complement(complement_row, 2);
+                        let local_there = matching_spatial.complement(complement_row, 2);
+                        let transition = local_there * local_turn.inverted();
+                        let position_and_direction =
+                            M2([V2([position.0 - corner_at.0, 0]), V2([0, 1])]);
+                        let M2([local_position_there, new_direction]) =
+                            transition * position_and_direction;
+                        let position_there = (
+                            local_position_there[0] + corner_there.0,
+                            local_position_there[1] + corner_there.1,
+                        );
+                        match map.get(&position_there) {
+                            Some(Cell::Floor) => {
+                                position = position_there;
+                                direction = match new_direction.0 {
+                                    [0, 1] => Direction::Right,
+                                    [0, -1] => Direction::Left,
+                                    [1, 0] => Direction::Down,
+                                    [-1, 0] => Direction::Up,
+                                    _ => unreachable!(),
+                                };
                             }
+                            Some(Cell::Wall) => {
+                                break 'walk;
+                            }
+                            None => unreachable!(),
                         }
                     }
                 },
@@ -568,17 +599,47 @@ pub fn star_two() -> isize {
                         break 'walk;
                     }
                     None => {
-                        'wrap: for r in (isize::MIN..=max_row).rev() {
-                            match map.get(&(r, position.1)) {
-                                Some(Cell::Floor) => {
-                                    position = (r, position.1);
-                                    break 'wrap;
-                                }
-                                Some(Cell::Wall) => {
-                                    break 'walk;
-                                }
-                                None => {}
+                        let corner_at = (
+                            position.0 / face_size * face_size,
+                            position.1 / face_size * face_size,
+                        );
+                        let spatial_rotation_at = cube[&corner_at];
+                        let spatial_turn = spatial_rotation_at * rot_north;
+                        let (&corner_there, &matching_spatial) = cube
+                            .iter()
+                            .find(|(_, m)| m[2] == spatial_turn[2])
+                            .unwrap();
+                        let (complement_row, _) = spatial_turn[2]
+                            .iter()
+                            .enumerate()
+                            .find(|(_, x)| **x != 0)
+                            .unwrap();
+                        let local_turn = spatial_turn.complement(complement_row, 2);
+                        let local_there = matching_spatial.complement(complement_row, 2);
+                        let transition = local_there * local_turn.inverted();
+                        let position_and_direction =
+                            M2([V2([0, position.1 - corner_at.1]), V2([-1, 0])]);
+                        let M2([local_position_there, new_direction]) =
+                            transition * position_and_direction;
+                        let position_there = (
+                            local_position_there[0] + corner_there.0,
+                            local_position_there[1] + corner_there.1,
+                        );
+                        match map.get(&position_there) {
+                            Some(Cell::Floor) => {
+                                position = position_there;
+                                direction = match new_direction.0 {
+                                    [0, 1] => Direction::Right,
+                                    [0, -1] => Direction::Left,
+                                    [1, 0] => Direction::Down,
+                                    [-1, 0] => Direction::Up,
+                                    _ => unreachable!(),
+                                };
                             }
+                            Some(Cell::Wall) => {
+                                break 'walk;
+                            }
+                            None => unreachable!(),
                         }
                     }
                 },
@@ -590,17 +651,47 @@ pub fn star_two() -> isize {
                         break 'walk;
                     }
                     None => {
-                        'wrap: for r in 0.. {
-                            match map.get(&(r, position.1)) {
-                                Some(Cell::Floor) => {
-                                    position = (r, position.1);
-                                    break 'wrap;
-                                }
-                                Some(Cell::Wall) => {
-                                    break 'walk;
-                                }
-                                None => {}
+                        let corner_at = (
+                            position.0 / face_size * face_size,
+                            position.1 / face_size * face_size,
+                        );
+                        let spatial_rotation_at = cube[&corner_at];
+                        let spatial_turn = spatial_rotation_at * rot_south;
+                        let (&corner_there, &matching_spatial) = cube
+                            .iter()
+                            .find(|(_, m)| m[2] == spatial_turn[2])
+                            .unwrap();
+                        let (complement_row, _) = spatial_turn[2]
+                            .iter()
+                            .enumerate()
+                            .find(|(_, x)| **x != 0)
+                            .unwrap();
+                        let local_turn = spatial_turn.complement(complement_row, 2);
+                        let local_there = matching_spatial.complement(complement_row, 2);
+                        let transition = local_there * local_turn.inverted();
+                        let position_and_direction =
+                            M2([V2([0, position.1 - corner_at.1]), V2([1, 0])]);
+                        let M2([local_position_there, new_direction]) =
+                            transition * position_and_direction;
+                        let position_there = (
+                            local_position_there[0] + corner_there.0,
+                            local_position_there[1] + corner_there.1,
+                        );
+                        match map.get(&position_there) {
+                            Some(Cell::Floor) => {
+                                position = position_there;
+                                direction = match new_direction.0 {
+                                    [0, 1] => Direction::Right,
+                                    [0, -1] => Direction::Left,
+                                    [1, 0] => Direction::Down,
+                                    [-1, 0] => Direction::Up,
+                                    _ => unreachable!(),
+                                };
                             }
+                            Some(Cell::Wall) => {
+                                break 'walk;
+                            }
+                            None => unreachable!(),
                         }
                     }
                 },
