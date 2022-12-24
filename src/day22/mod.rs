@@ -34,9 +34,9 @@ impl std::ops::Deref for M3 {
 impl M3 {
     fn transposed(self) -> Self {
         M3([
-            V3([self[0][0], self[0][1], self[0][2]]),
-            V3([self[1][0], self[1][1], self[1][2]]),
-            V3([self[2][0], self[2][1], self[2][2]]),
+            V3([self[0][0], self[1][0], self[2][0]]),
+            V3([self[0][1], self[1][1], self[2][1]]),
+            V3([self[0][2], self[1][2], self[2][2]]),
         ])
     }
 
@@ -109,15 +109,7 @@ impl std::ops::Deref for M2 {
 
 impl M2 {
     fn transposed(self) -> Self {
-        M2([V2([self[0][0], self[0][1]]), V2([self[1][0], self[1][1]])])
-    }
-
-    fn inverted(self) -> Self {
-        let det = self[0][0] * self[1][1] - self[0][1] * self[1][0];
-        M2([
-            V2([self[1][1] / det, -self[0][1] / det]),
-            V2([-self[1][0] / det, self[0][0] / det]),
-        ])
+        M2([V2([self[0][0], self[1][0]]), V2([self[0][1], self[1][1]])])
     }
 }
 
@@ -466,26 +458,6 @@ pub fn star_two() -> isize {
         code_index = token_end + 1;
 
         'walk: for _ in 0..steps {
-            println!("{steps} {rotation:?}");
-            for r in -10..10 {
-                let r = position.0 + r;
-                for c in -10..10 {
-                    let c = position.1 + c;
-                    print!("{}", match map.get(&(r,c)) {
-                        _ if (r == position.0 && c == position.1) => match direction {
-                            Direction::Down => "v",
-                            Direction::Up => "^",
-                            Direction::Left => "<",
-                            Direction::Right => ">",
-                        }
-                        Some(Cell::Floor) => ".",
-                        Some(Cell::Wall) => "#",
-                        None => " ",
-                    });
-                }
-                println!()
-            }
-            println!();
             match direction {
                 Direction::Left => match map.get(&(position.0, position.1 - 1)) {
                     Some(Cell::Floor) => {
@@ -501,25 +473,23 @@ pub fn star_two() -> isize {
                         );
                         let spatial_rotation_at = cube[&corner_at];
                         let spatial_turn = spatial_rotation_at * rot_west;
-                        let (&corner_there, &matching_spatial) = cube
-                            .iter()
-                            .find(|(_, m)| m[2] == spatial_turn[2])
-                            .unwrap();
-                        let (complement_row, _) = spatial_turn[2]
-                            .iter()
-                            .enumerate()
-                            .find(|(_, x)| **x != 0)
-                            .unwrap();
-                        let local_turn = spatial_turn.complement(complement_row, 2);
-                        let local_there = matching_spatial.complement(complement_row, 2);
-                        let transition = local_there * local_turn.inverted();
-                        let position_and_direction =
-                            M2([V2([position.0 - corner_at.0, 0]), V2([0, -1])]);
+                        let (&corner_there, &matching_spatial) =
+                            cube.iter().find(|(_, m)| m[2] == spatial_turn[2]).unwrap();
+                        let transition =
+                            (matching_spatial.transposed() * spatial_turn).complement(2, 2);
+                        let dr = (position.0 - corner_at.0) * 2 + 1;
+                        let position_and_direction = M2([V2([dr, 0]), V2([0, -1])]);
                         let M2([local_position_there, new_direction]) =
                             transition * position_and_direction;
+                        let d_there = (
+                            (local_position_there[0] + new_direction[0] + 4 * face_size)
+                                % (2 * face_size),
+                            (local_position_there[1] + new_direction[1] + 4 * face_size)
+                                % (2 * face_size),
+                        );
                         let position_there = (
-                            local_position_there[0] + corner_there.0,
-                            local_position_there[1] + corner_there.1,
+                            corner_there.0 + d_there.0 / 2,
+                            corner_there.1 + d_there.1 / 2,
                         );
                         match map.get(&position_there) {
                             Some(Cell::Floor) => {
@@ -553,25 +523,23 @@ pub fn star_two() -> isize {
                         );
                         let spatial_rotation_at = cube[&corner_at];
                         let spatial_turn = spatial_rotation_at * rot_east;
-                        let (&corner_there, &matching_spatial) = cube
-                            .iter()
-                            .find(|(_, m)| m[2] == spatial_turn[2])
-                            .unwrap();
-                        let (complement_row, _) = spatial_turn[2]
-                            .iter()
-                            .enumerate()
-                            .find(|(_, x)| **x != 0)
-                            .unwrap();
-                        let local_turn = spatial_turn.complement(complement_row, 2);
-                        let local_there = matching_spatial.complement(complement_row, 2);
-                        let transition = local_there * local_turn.inverted();
-                        let position_and_direction =
-                            M2([V2([position.0 - corner_at.0, 0]), V2([0, 1])]);
+                        let (&corner_there, &matching_spatial) =
+                            cube.iter().find(|(_, m)| m[2] == spatial_turn[2]).unwrap();
+                        let transition =
+                            (matching_spatial.transposed() * spatial_turn).complement(2, 2);
+                        let dr = (position.0 - corner_at.0) * 2 + 1;
+                        let position_and_direction = M2([V2([dr, 0]), V2([0, 1])]);
                         let M2([local_position_there, new_direction]) =
                             transition * position_and_direction;
+                        let d_there = (
+                            (local_position_there[0] + new_direction[0] + 4 * face_size)
+                                % (2 * face_size),
+                            (local_position_there[1] + new_direction[1] + 4 * face_size)
+                                % (2 * face_size),
+                        );
                         let position_there = (
-                            local_position_there[0] + corner_there.0,
-                            local_position_there[1] + corner_there.1,
+                            corner_there.0 + d_there.0 / 2,
+                            corner_there.1 + d_there.1 / 2,
                         );
                         match map.get(&position_there) {
                             Some(Cell::Floor) => {
@@ -605,25 +573,23 @@ pub fn star_two() -> isize {
                         );
                         let spatial_rotation_at = cube[&corner_at];
                         let spatial_turn = spatial_rotation_at * rot_north;
-                        let (&corner_there, &matching_spatial) = cube
-                            .iter()
-                            .find(|(_, m)| m[2] == spatial_turn[2])
-                            .unwrap();
-                        let (complement_row, _) = spatial_turn[2]
-                            .iter()
-                            .enumerate()
-                            .find(|(_, x)| **x != 0)
-                            .unwrap();
-                        let local_turn = spatial_turn.complement(complement_row, 2);
-                        let local_there = matching_spatial.complement(complement_row, 2);
-                        let transition = local_there * local_turn.inverted();
-                        let position_and_direction =
-                            M2([V2([0, position.1 - corner_at.1]), V2([-1, 0])]);
+                        let (&corner_there, &matching_spatial) =
+                            cube.iter().find(|(_, m)| m[2] == spatial_turn[2]).unwrap();
+                        let transition =
+                            (matching_spatial.transposed() * spatial_turn).complement(2, 2);
+                        let dc = (position.1 - corner_at.1) * 2 + 1;
+                        let position_and_direction = M2([V2([0, dc]), V2([-1, 0])]);
                         let M2([local_position_there, new_direction]) =
                             transition * position_and_direction;
+                        let d_there = (
+                            (local_position_there[0] + new_direction[0] + 4 * face_size)
+                                % (2 * face_size),
+                            (local_position_there[1] + new_direction[1] + 4 * face_size)
+                                % (2 * face_size),
+                        );
                         let position_there = (
-                            local_position_there[0] + corner_there.0,
-                            local_position_there[1] + corner_there.1,
+                            corner_there.0 + d_there.0 / 2,
+                            corner_there.1 + d_there.1 / 2,
                         );
                         match map.get(&position_there) {
                             Some(Cell::Floor) => {
@@ -657,25 +623,23 @@ pub fn star_two() -> isize {
                         );
                         let spatial_rotation_at = cube[&corner_at];
                         let spatial_turn = spatial_rotation_at * rot_south;
-                        let (&corner_there, &matching_spatial) = cube
-                            .iter()
-                            .find(|(_, m)| m[2] == spatial_turn[2])
-                            .unwrap();
-                        let (complement_row, _) = spatial_turn[2]
-                            .iter()
-                            .enumerate()
-                            .find(|(_, x)| **x != 0)
-                            .unwrap();
-                        let local_turn = spatial_turn.complement(complement_row, 2);
-                        let local_there = matching_spatial.complement(complement_row, 2);
-                        let transition = local_there * local_turn.inverted();
-                        let position_and_direction =
-                            M2([V2([0, position.1 - corner_at.1]), V2([1, 0])]);
+                        let (&corner_there, &matching_spatial) =
+                            cube.iter().find(|(_, m)| m[2] == spatial_turn[2]).unwrap();
+                        let transition =
+                            (matching_spatial.transposed() * spatial_turn).complement(2, 2);
+                        let dc = (position.1 - corner_at.1) * 2 + 1;
+                        let position_and_direction = M2([V2([0, dc]), V2([1, 0])]);
                         let M2([local_position_there, new_direction]) =
                             transition * position_and_direction;
+                        let d_there = (
+                            (local_position_there[0] + new_direction[0] + 4 * face_size)
+                                % (2 * face_size),
+                            (local_position_there[1] + new_direction[1] + 4 * face_size)
+                                % (2 * face_size),
+                        );
                         let position_there = (
-                            local_position_there[0] + corner_there.0,
-                            local_position_there[1] + corner_there.1,
+                            corner_there.0 + d_there.0 / 2,
+                            corner_there.1 + d_there.1 / 2,
                         );
                         match map.get(&position_there) {
                             Some(Cell::Floor) => {
