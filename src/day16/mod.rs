@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 
 struct Valve {
@@ -239,6 +240,8 @@ pub fn star_two() -> usize {
         }
     }
 
+    let mut visited = BTreeMap::<(&str, &str), HashMap<BTreeSet<&str>, usize>>::new();
+
     let mut max = 0;
     let mut exploration = VecDeque::<(Vec<Action>, Vec<Action>)>::from([(vec![], vec![])]);
     while let Some((my_pathing, his_pathing)) = exploration.pop_front() {
@@ -258,6 +261,31 @@ pub fn star_two() -> usize {
         });
         if pathing_score > max {
             max = pathing_score;
+        }
+
+        // memoised
+        let my_id_at = match my_pathing.last() {
+            Some(Action::Open(id_at)) => *id_at,
+            None => "AA",
+            _ => unreachable!(),
+        };
+        let his_id_at = match his_pathing.last() {
+            Some(Action::Open(id_at)) => *id_at,
+            None => "AA",
+            _ => unreachable!(),
+        };
+        if let Some(cached_flow) = visited
+            .entry(if my_id_at < his_id_at {
+                (my_id_at, his_id_at)
+            } else {
+                (his_id_at, my_id_at)
+            })
+            .or_default()
+            .insert(good_ids_visited.clone(), pathing_score)
+        {
+            if cached_flow > pathing_score {
+                continue;
+            }
         }
 
         // suboptimality
@@ -310,11 +338,6 @@ pub fn star_two() -> usize {
 
         if my_pathing.len() < 25 || his_pathing.len() < 25 {
             if my_pathing.len() <= his_pathing.len() {
-                let my_id_at = match my_pathing.last() {
-                    Some(Action::Open(id_at)) => *id_at,
-                    None => "AA",
-                    _ => unreachable!(),
-                };
                 for &good_id_to in good_valves.keys() {
                     if !good_ids_visited.contains(good_id_to) {
                         let path_extension = map
@@ -330,11 +353,6 @@ pub fn star_two() -> usize {
                     }
                 }
             } else {
-                let his_id_at = match his_pathing.last() {
-                    Some(Action::Open(id_at)) => *id_at,
-                    None => "AA",
-                    _ => unreachable!(),
-                };
                 for &good_id_to in good_valves.keys() {
                     if !good_ids_visited.contains(good_id_to) {
                         let path_extension = map
